@@ -4,6 +4,7 @@ import (
     "fmt"
     "time"
     "log"
+    "encoding/json"
     "github.com/boltdb/bolt"
 )
 
@@ -13,6 +14,62 @@ func main() {
         log.Fatal(err)
     }
     defer db.Close()
+
+    // Create bucket
+    db.Update(func(tx *bolt.Tx) error {
+        b, err := tx.CreateBucketIfNotExists([]byte("bukkit"))
+        if err != nil {
+            return fmt.Errorf("create bucket: %s", err)
+        }
+        return nil
+    })
+
+    //Iterating over keys
+    db.View(func(tx *bolt.Tx) error {
+        b := tx.Bucket([]byte("bukkit"))
+        c := b.Cursor()
+
+        for k,v := c.First(); k != nil; k,v = c.Next() {
+            fmt.Printf("key=%s, value=%s\n", k, v)
+        }
+        return nil
+    })
+
+    /* Accessing variables from BoltDB
+       Create an empty instance of the variable outside of the function
+       scope and use it in your program later. This ensures that data is
+       returned in the correct order and that there are no unexpected
+       results*/
+    var val []byte
+    err := db.Batch(func(tx *bolt.Tx) error {
+        b := tx.Bucket([]byte("MyBucket"))
+        val = b.Get([]byte("My Key"))
+        return nil
+    })
+
+    if err != nil {
+        return
+    }
+    fmt.Println("Got value %v", val)
+
+    /* Nested Buckets */
+    type Data struct {
+        Name string `json:"name"`
+    }
+
+    JSONResult := Data{}
+
+    db.Update(func(tx *bolt.Tx) error {
+        w, err := tx.CreateBucketIfNotExists([]byte("Primary Bucket"))
+        if err != nil {
+            fmt.Println(err)
+            return err
+        }
+        x, err := w.CreateBucketIfNotExists([]byte("Secondary Bucket"))
+        JSON := x.Get([]byte("Key Number 1"))
+        json.Unmarshal(JSON, &JSONResult)
+        return err
+    })
 
     go func() {
         put := func(tx *bolt.Tx) error {
