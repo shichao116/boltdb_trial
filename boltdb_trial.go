@@ -17,16 +17,44 @@ func main() {
 
     // Create bucket
     db.Update(func(tx *bolt.Tx) error {
-        b, err := tx.CreateBucketIfNotExists([]byte("bukkit"))
+        _, err := tx.CreateBucketIfNotExists([]byte("MyBucket"))
         if err != nil {
             return fmt.Errorf("create bucket: %s", err)
         }
         return nil
     })
 
+    // Add key, value pairs
+    db.Update(func(tx *bolt.Tx) error {
+        b := tx.Bucket([]byte("MyBucket"))
+        if err := b.Put([]byte("answer"), []byte("42")); err != nil {
+            return err
+        }
+        if err := b.Put([]byte("question1"), []byte("what")); err != nil {
+            return err
+        }
+        if err := b.Put([]byte("question2"), []byte("where")); err != nil {
+            return err
+        }
+        if err := b.Put([]byte("question3"), []byte("who")); err != nil {
+            return err
+        }
+        if err := b.Put([]byte("question4"), []byte("how")); err != nil {
+            return err
+        }
+        return nil
+    })
+
+    db.View(func(tx *bolt.Tx) error {
+        b := tx.Bucket([]byte("MyBucket"))
+        v := b.Get([]byte("answer"))
+        fmt.Printf("The answer is: %s\n", v)
+        return nil
+    })
+
     //Iterating over keys
     db.View(func(tx *bolt.Tx) error {
-        b := tx.Bucket([]byte("bukkit"))
+        b := tx.Bucket([]byte("MyBucket"))
         c := b.Cursor()
 
         for k,v := c.First(); k != nil; k,v = c.Next() {
@@ -36,14 +64,14 @@ func main() {
     })
 
     /* Accessing variables from BoltDB
-       Create an empty instance of the variable outside of the function
-       scope and use it in your program later. This ensures that data is
-       returned in the correct order and that there are no unexpected
-       results*/
+    Create an empty instance of the variable outside of the function
+    scope and use it in your program later. This ensures that data is
+    returned in the correct order and that there are no unexpected
+    results*/
     var val []byte
-    err := db.Batch(func(tx *bolt.Tx) error {
+    err = db.Batch(func(tx *bolt.Tx) error {
         b := tx.Bucket([]byte("MyBucket"))
-        val = b.Get([]byte("My Key"))
+        val = b.Get([]byte("question1"))
         return nil
     })
 
@@ -66,16 +94,34 @@ func main() {
             return err
         }
         x, err := w.CreateBucketIfNotExists([]byte("Secondary Bucket"))
-        JSON := x.Get([]byte("Key Number 1"))
-        json.Unmarshal(JSON, &JSONResult)
-        return err
+        if err != nil {
+            return err
+        }
+        if err := x.Put([]byte("name"), []byte("chao")); err != nil {
+            return err
+        }
+        return nil
     })
+    db.View(func(tx *bolt.Tx) error {
+        x := tx.Bucket([]byte("Primary Bucket")).Bucket([]byte("Secondary Bucket"))
+        JSON := x.Get([]byte("name"))
+        fmt.Println(JSON)
+        err := json.Unmarshal(JSON, &JSONResult)
+        if err != nil {
+            fmt.Println("error:", err)
+        }
+        return nil
+    })
+    fmt.Printf("%+v\n", JSONResult)
 
     go func() {
         put := func(tx *bolt.Tx) error {
             now := time.Now().Format("15:04:05.000")
             fmt.Printf("updating at\t%s\n", now)
-            bucket := tx.Bucket([]byte("bukkit"))
+            bucket, err := tx.CreateBucketIfNotExists([]byte("bukkit"))
+            if err != nil {
+                return err
+            }
             if err := bucket.Put([]byte("clock"), []byte(now)); err != nil {
                 return err
             }
@@ -90,11 +136,12 @@ func main() {
     }()
 
     time.Sleep(500 * time.Millisecond)
+
     var result []byte
     get := func(tx *bolt.Tx) error {
         fmt.Println("reading...")
         time.Sleep(500 * time.Millisecond)
-        bucket := tx.Bucket([]byte("bukit"))
+        bucket := tx.Bucket([]byte("bukkit"))
         clock := bucket.Get([]byte("clock"))
         fmt.Println("observing %s\n", clock)
         result = make([]byte, len(clock))
