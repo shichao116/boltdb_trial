@@ -97,7 +97,7 @@ func main() {
         if err != nil {
             return err
         }
-        if err := x.Put([]byte("name"), []byte("chao")); err != nil {
+        if err := x.Put([]byte("name"), []byte(`{"name": "chao"}`)); err != nil {
             return err
         }
         return nil
@@ -108,7 +108,7 @@ func main() {
         fmt.Println(JSON)
         err := json.Unmarshal(JSON, &JSONResult)
         if err != nil {
-            fmt.Println("error:", err)
+            fmt.Println(err)
         }
         return nil
     })
